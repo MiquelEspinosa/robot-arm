@@ -69,7 +69,7 @@ def make_kid(population, n_kid):
         # variances mutation 
         ks = np.exp(np.multiply(np.random.normal(0,tau),ks))
 
-        # clip the mutated value    
+        # clip the mutated value
         kv[:] = np.clip(kv, *DNA_BOUND)    
 
         # mutate (change DNA based on normal distribution)
