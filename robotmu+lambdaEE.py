@@ -2,6 +2,7 @@ import numpy as np
 import requests
 import time
 import matplotlib.pyplot as plt
+import concurrent.futures as futures
 from threading import Thread
 
 # lamda = kids
@@ -10,7 +11,7 @@ from threading import Thread
 # NETWORKING
 URL_PATH = "http://163.117.164.219/age/robot4?"
 N_THREADS = 10
-MAX_RETRIES = 10
+MAX_RETRIES = 20
 
 # CONSTANTES
 DNA_SIZE = 4                             # Corresponds to the number of motors
@@ -27,61 +28,80 @@ PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
 generations_plt = []    # Plotting axis
 fitness_curve = []      # Plotting curve
 
-def process_individual(session, url):
+def process_individual(session, individual):
     """ process a single individual """
-    return float(session.get(url).content)
+    url = URL_PATH
+    for rotor in range(0,len(individual)):
+        url = url + str("c")+str(rotor+1)+str("=")+str(individual[rotor])+str("&")
+    url = url[:-1]
+    try:
+        r = session.get(url).content
+    except:
+        print("Exception when calling web service")
+        time.sleep(1)
+        r = session.get(url).content
+    return float(r)
 
-def process_id_range(id_range, urls, session, store=None):
-    """process a number of urls, storing the results in an array"""
-    if store is None:
-        store = {}
-        print("jua jua jua")
-    for id in id_range:
-        store[id] = process_individual(session, urls[id])
-    return store
+# def process_id_range(id_range, urls, session, store=None):
+#     """process a number of urls, storing the results in an array"""
+#     if store is None:
+#         store = {}
+#     for id in id_range:
+#         store[id] = process_individual(session, urls[id])
+#     return store
 
-def get_urls(population):
-    all_urls = []
-    for row, ind in enumerate(population['DNA']):
-        url = URL_PATH
-        for rotor in range(0,len(ind)):
-            # This is for getting the fitness of an specific individual
-            url = url + str("c")+str(rotor+1)+str("=")+str(ind[rotor])+str("&")
-        url = url[:-1]
+# def get_urls(population):
+#     all_urls = []
+#     for ind in population['DNA']:
+#         url = URL_PATH
+#         for rotor in range(0,len(ind)):
+#             # This is for getting the fitness of an specific individual
+#             url = url + str("c")+str(rotor+1)+str("=")+str(ind[rotor])+str("&")
+#         url = url[:-1]
+#         all_urls.append(url)
+#     return all_urls
 
-        all_urls.append(url)
-    return all_urls
+def evaluation(population, session):
+    pop_size = len(population['DNA'])
+    population_fitness = np.empty(pop_size)
+    # urls = get_urls(population)
 
-def evaluation(nthreads, population, session):
-    """process the population in a specified number of threads"""
-    id_range = range(len(population['DNA']))
-    fitnesses = {}
-    threads = []
-    urls = get_urls(population)
-    # create the threads
-    for i in range(nthreads):
-        ids = id_range[i::nthreads]
-        t = Thread(target=process_id_range, args=(ids, urls, session, fitnesses))
-        threads.append(t)
+    with futures.ThreadPoolExecutor(max_workers=100) as executor:
+        future = [
+            executor.submit(process_individual, session, ind)
+            for ind in population['DNA']
+        ]
+    population_fitness = [f.result() for f in future]
+    return np.array(population_fitness)
+
+# def evaluation_bad(nthreads, population, session):
+#     """process the population in a specified number of threads"""
+#     id_range = range(len(population['DNA']))
+#     fitnesses = {}
+#     threads = []
+#     urls = get_urls(population)
+#     # create the threads
+#     for i in range(nthreads):
+#         ids = id_range[i::nthreads]
+#         t = Thread(target=process_id_range, args=(ids, urls, session, fitnesses))
+#         threads.append(t)
     
-    # start the threads
-    [ t.start() for t in threads ]
-    # wait for the threads to finish
-    [ t.join() for t in threads ]
+#     # start the threads
+#     [ t.start() for t in threads ]
+#     # wait for the threads to finish
+#     [ t.join() for t in threads ]
     
-    array = np.empty(len(population['DNA']))
-    for i in range(len(population['DNA'])):
-        array[i]=fitnesses[i]
+#     print("yes, joined")
+#     array = np.empty(len(population['DNA']))
+#     for i in range(len(population['DNA'])):
+#         array[i]=fitnesses[i]
     
-    return array
+#     return array
 
 
 # c1=3.412&c2=2.4&c3=15.42312&c4=-23.412235
 # def good_evaluation(population, session):
-
-#     fitness_population = np.empty(POPULATION_SIZE)
-
-
+#     fitness_population = np.empty(len(population['DNA']))
 #     for row, ind in enumerate(population['DNA']):
 #         url = URL_PATH
 #         for rotor in range(0,len(ind)):
@@ -147,7 +167,7 @@ def kill_bad(pop, kids, session):
     for key in ['DNA', 'mut_strength']:
         pop[key] = np.vstack((pop[key], kids[key]))
 
-    fitness = evaluation(N_THREADS, pop, session)            # calculate global fitness
+    fitness = evaluation(pop, session)            # calculate global fitness
     idx = np.arange(pop['DNA'].shape[0])
     index_sort = fitness.argsort()
     good_idx = idx[index_sort][:POPULATION_SIZE]   # selected by fitness ranking (not value)
@@ -161,22 +181,18 @@ def main():
     population = dict(DNA=np.random.uniform(low=DNA_BOUND[0], high=DNA_BOUND[1], size=(POPULATION_SIZE,DNA_SIZE) ),   
             mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*DNA_BOUND[1])                                     
 
-    
     # for plotting
     if PLOTTING_REAL_TIME == 1:
         plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
         plt.xlabel('Generations')
         plt.ylabel('Fitness')
         plt.legend()
-
+    
     # create Session with server
     session = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(max_retries=MAX_RETRIES)
-    session.mount('https://', adapter)
+    adapter = requests.adapters.HTTPAdapter(pool_connections=POPULATION_SIZE, pool_maxsize=POPULATION_SIZE, max_retries=MAX_RETRIES)
     session.mount('http://', adapter)
 
-    a=evaluation(N_THREADS, population, session)
-    # b=good_evaluation(population, session)
 
     for i in range(N_GENERATIONS):
         # print(population['mut_strength'])
@@ -185,7 +201,6 @@ def main():
         population, fitness_pop = kill_bad(population, kids, session)   # keep some good parent for elitism
         # fitness_population = evaluation(population)
         
-
         if PLOTTING_REAL_TIME == 1:
             generations_plt.append(i)
             fitness_curve.append(fitness_pop[0])
