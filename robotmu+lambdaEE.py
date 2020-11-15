@@ -16,12 +16,12 @@ MAX_RETRIES = 10
 # CONSTANTES
 DNA_SIZE = 4                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
-POPULATION_SIZE = 200                     # Population size
-N_GENERATIONS = 1000
-N_KID = 250                               # n kids per generation = lambda
+POPULATION_SIZE = 100                     # Population size
+N_GENERATIONS = 500
+N_KID = 100                               # n kids per generation = lambda
 tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
 tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
-size_tournament = 5
+size_tournament = 3
 
 # Plotting
 PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
@@ -80,9 +80,17 @@ def make_kid(population, n_kid):
         ks[~cp] = population['mut_strength'][p2, ~cp]
 
         # DNA and variances mutation 
+        # print("----------------------------------------------")
+        # print("DNA before mutation: ", kv)
         kv = np.random.normal(kv,ks)
+        # print("DNA after mutation: ", kv)
+        # print()
+        # print("VARIANCE before mutation: ",ks)
+
         ks = np.dot(ks, np.dot(np.exp(np.random.normal(0,tau,DNA_SIZE)), np.exp(np.random.normal(0,tau0,DNA_SIZE))))
-        
+        # print("VARIANCE after mutation: ",ks)
+        # print("----------------------------------------------")
+        # time.sleep(2)
         # clip the mutated value
         kv[:] = np.clip(kv, *DNA_BOUND)
 
@@ -126,7 +134,8 @@ def main():
     # initialize randomly the population DNA values (motor angles)
     # initialize randomly the variances with big values
     population = dict(DNA=np.random.uniform(low=DNA_BOUND[0], high=DNA_BOUND[1], size=(POPULATION_SIZE,DNA_SIZE) ),   
-            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*(DNA_BOUND[1]/2))                                     
+            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE))                                     
+            # mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*(DNA_BOUND[1]/2))                                     
     
     # for plotting
     if PLOTTING_REAL_TIME == 1:
@@ -145,7 +154,13 @@ def main():
         population, fitness_pop = kill_bad(population, kids, session)   # keep some good parent for elitism
         # fitness_population = evaluation(population)
         
-        print(population['mut_strength'][0])
+        if i%10==0:
+            print(" Iteration num: ",i)
+            print(" Best fitness value: ",fitness_pop[0])
+            print(" DNA value: ",population['DNA'][0])
+            print("-------------------------------")
+
+        # print(population['mut_strength'][0])
 
         file.write(' %r\t\t\t%r\n\t\t\t\t\t\t%r\n\n' % (fitness_pop[0],population['DNA'][0],population['mut_strength'][0]))
 
