@@ -12,15 +12,12 @@ MAX_RETRIES = 10
 # CONSTANTES
 DNA_SIZE = 10                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
-N_GENERATIONS = 1000
-# tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
-# tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
+N_GENERATIONS = 2000
 
 # one-fifth rule
-c = 0.82                                 # constante para la regla de 1/5
-s = 10                                   # tamaño ventana para array de mejoras
+c = 0.8                                 # constante para la regla de 1/5
+s = 15                                   # tamaño ventana para array de mejoras
 success = np.zeros(s)                 # guardamos el número de mejoras por cada s iteraciones
-# last_fitness = np.zeros(s*2)                 # guardamos las ultimas s fitness
 
 # Plotting
 PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
@@ -65,10 +62,9 @@ def regla1_5(first_iter, mut_values, ratio):
     else:
         return mut_values
 
-def kill_bad(dad, kid, session):
+def kill_bad(dad, kid, session, num_decimals):
     fit_dad = evaluation(dad['DNA'], session)
     fit_kid = evaluation(kid['DNA'], session)
-    num_decimals = 1
     if round(fit_dad, num_decimals) < round(fit_kid, num_decimals): 
         return dad, fit_dad, 0 # we did not improve
     else:
@@ -104,9 +100,17 @@ def main():
     session = requests.Session()
 
     for i in range(N_GENERATIONS):
+        
+        # small trick for fast convergence at the start, and slower and precise at the end
+        if (i < (N_GENERATIONS*0.8)):
+            num_decimals = 0
+        elif (i < (N_GENERATIONS*0.9)):
+            num_decimals = 1
+        else:
+            num_decimals = 2
 
         kid = make_kid(dad)
-        best, fitness, winner = kill_bad(dad, kid, session)
+        best, fitness, winner = kill_bad(dad, kid, session, num_decimals)
         
         j = i%s # posición en array "success"
         success[j] = winner # winner is 0 if dad won, or 1 if kid won
@@ -117,16 +121,7 @@ def main():
 
         fitness_curve.append(fitness) # Append best individual for plotting
 
-        # Avoid local minima --> mutation boost
-        # print("STD FITNESS LAST 10: ",np.std(last_fitness))
-        # k = i%(s*2)
-        # last_fitness[k] = fitness # store last "s" fitnesses
-        # if np.std(last_fitness < 0.005):
-        #     print("entra")
-        #     best['mut_strength'] = best['mut_strength'] * 10
-
         dad = best
-
 
 
         # ------- PLOTTING, PRINTING AND OTHERS ---------------
