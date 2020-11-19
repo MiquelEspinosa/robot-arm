@@ -16,9 +16,9 @@ MAX_RETRIES = 10
 # CONSTANTES
 DNA_SIZE = 4                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
-POPULATION_SIZE = 200                     # Population size
+POPULATION_SIZE = 100                     # Population size
 N_GENERATIONS = 500
-N_KID = 400                               # n kids per generation = lambda
+N_KID = 200                               # n kids per generation = lambda
 tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
 tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
 size_tournament = 5
@@ -27,6 +27,8 @@ size_tournament = 5
 PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
 generations_plt = []    # Plotting axis
 fitness_curve = []      # Plotting curve
+fitness_curve2 = []      # Plotting curve
+fitness_curve3 = []      # Plotting curve
 save_results = 'output'
 
 def process_individual(session, individual):
@@ -132,6 +134,8 @@ def main():
     # for plotting
     if PLOTTING_REAL_TIME == 1:
         plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
+        plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
+        plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
         plt.xlabel('Generations')
         plt.ylabel('Fitness')
         plt.legend()
@@ -145,25 +149,31 @@ def main():
         kids = make_kid(population, N_KID)
         population, fitness_pop = kill_bad(population, kids, session)   # keep some good parent for elitism
         # fitness_population = evaluation(population)
-        
+
+        fitness_curve.append(fitness_pop[0]) # Append best individual for plotting
+
+        if (fitness_curve[i-1] != fitness_curve[i]):
+            file.write(' %r\t\t\t%r\n\t\t\t\t\t\t%r\n\n' % (fitness_pop[0],population['DNA'][0],population['mut_strength'][0]))
+
+        if PLOTTING_REAL_TIME == 1:
+            generations_plt.append(i)
+            unique = np.unique(fitness_pop) # return ordered unique population fitness
+            fitness_curve2.append(unique[1]) # second best individual
+            fitness_curve3.append(unique[2]) # third best individual
+            plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
+            plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
+            plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
+            plt.pause(0.001)
+
         if i%10==0:
             print("Iteration num: ",i)
             print("  Best fitness value: ",fitness_pop[0])
             print("    - DNA value: ",population['DNA'][0])
-            print("    - Mutation values: ",population['DNA'][0])
+            print("    - Mutation values: ",population['mut_strength'][0])
             print("  Standard deviation population DNA: ",np.std(population['DNA']))
             print("  Standard deviation population mut_strength: ",np.std(population['mut_strength']))
+            print("  Num of different individuals: ",len(unique))
             print("-------------------------------")
-
-        # print(population['mut_strength'][0])
-
-        file.write(' %r\t\t\t%r\n\t\t\t\t\t\t%r\n\n' % (fitness_pop[0],population['DNA'][0],population['mut_strength'][0]))
-
-        if PLOTTING_REAL_TIME == 1:
-            generations_plt.append(i)
-            fitness_curve.append(fitness_pop[0])
-            plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
-            plt.pause(0.05)
 
         if (fitness_pop[0] == 0 or i == N_GENERATIONS-1):
             plt.savefig(str(save_results+'.png'))
@@ -177,6 +187,8 @@ def main():
             else:
                 print(" *** Maximum number of iterations reached ***")
             break
+
+
 
 
 if __name__ == "__main__":
