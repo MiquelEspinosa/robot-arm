@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 import concurrent.futures as futures
 from threading import Thread
+import sys, getopt
 
 # NETWORKING
 URL_PATH = "http://163.117.164.219/age/robot10?"
@@ -24,6 +25,35 @@ PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
 generations_plt = []    # Plotting axis
 fitness_curve = []      # Plotting curve
 save_results = 'output'
+
+# -------------------------- Arguments parsing -------------------------- #
+# Options 
+options = "f:r:n:c:s:"
+# Long options 
+long_options = ["file=", "robot=", "numgeneration=", "constante=", "ventana="]
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:],options,long_options)
+except getopt.GetoptError:
+    # print('main.py -f <outputfile> -r <robot> -p <population_size> -t <tournament_size> -m <mutation_size> -e <pure_elitism>')
+    sys.exit(2)
+
+for opt, arg in opts:
+    if opt == '-h':
+        # print('main.py -f <outputfile> -h <help> -p <population_size> -t <tournament_size> -m <mutation_size> -e <pure_elitism>')
+        sys.exit()
+    elif opt in ("-f", "--file"):
+        save_results = arg
+    elif opt in ("-r", "--robot"):
+        robot = arg
+        URL_PATH = str("http://163.117.164.219/age/robot"+robot+"?")
+    elif opt in ("-n", "--numgeneration"):
+        N_GENERATIONS = int(arg)
+    elif opt in ("-c", "--constante"):
+        c = float(arg)
+    elif opt in ("-s", "--ventana"):
+        s = int(arg)
+
 
 def evaluation(individual, session):
     url = URL_PATH
@@ -74,6 +104,10 @@ def write_header_txt(file):
     file.write('------------------------------------ \n')
     file.write('PARAMETERS used: \n')
     file.write(' - DNA SIZE: %r\n' % str(DNA_SIZE))
+    file.write(' - c: %r\n' % str(c))
+    file.write(' - s: %r\n' % str(s))
+    file.write(' - num rotors in robot: %r\n' % str(robot))
+    file.write(' - num total generations: %r\n' % str(N_GENERATIONS))
     file.write('------------------------------------ \n\n\n')
     file.write('------------------------------------ \n')
     file.write('Fitness_value\t\tIndividual\n')
