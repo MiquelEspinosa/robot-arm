@@ -9,25 +9,21 @@ from threading import Thread
 # mu = progenitores
 
 # NETWORKING
-URL_PATH = "http://163.117.164.219/age/robot4?"
+URL_PATH = "http://163.117.164.219/age/robot10?"
 # N_THREADS = 10
 MAX_RETRIES = 10
 
 # CONSTANTES
-DNA_SIZE = 4                             # Corresponds to the number of motors
+DNA_SIZE = 10                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
-POPULATION_SIZE = 100                     # Population size
+POPULATION_SIZE = 500                     # Population size
 N_GENERATIONS = 1000
-N_KID = 100                               # n kids per generation = lambda
-tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
-tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
+N_KID = 700                               # n kids per generation = lambda
+tau = 0.9/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
+tau0 = 0.9/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
+
 size_tournament = 3
 
-# adaptation one-fifth rule
-previous_fitness_pop = np.ones(POPULATION_SIZE)
-c = 0.82                                 # constante para la regla de 1/5
-# s = 15                                   # tamaño ventana para array de mejoras
-# success = np.zeros(s)                 # guardamos el número de mejoras por cada s iteraciones
 
 # Plotting
 PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
@@ -53,7 +49,7 @@ def process_individual(session, individual):
 def evaluation(population, session):
     pop_size = len(population['DNA'])
     population_fitness = np.empty(pop_size)
-    with futures.ThreadPoolExecutor(max_workers=POPULATION_SIZE/2) as executor:
+    with futures.ThreadPoolExecutor(max_workers=POPULATION_SIZE) as executor:
         future = [
             executor.submit(process_individual, session, ind)
             for ind in population['DNA']
@@ -61,57 +57,58 @@ def evaluation(population, session):
     population_fitness = [f.result() for f in future]
     return np.array(population_fitness)
 
-def tournament(population, size_tournament, num_parents):
-    selected = []
+def tournament(population, size_tournament, num_parents, fitness_pop):
+    selected = [] # list of indexes of all tournament winners
     for _ in range(num_parents):
-        winner = np.random.choice(np.arange(POPULATION_SIZE), size=size_tournament, replace=False)
-        selected.append(np.max(winner))
+        tournament_fitness = []
+        participants = np.random.choice(np.arange(POPULATION_SIZE), size=size_tournament, replace=False)
+        for j in participants:
+            tournament_fitness.append(fitness_pop[j])
+        index = np.argmin(tournament_fitness) # get index of min fitness
+        selected.append(participants[index]) # append index of participant with min fitness
     return selected
     
-def make_kid(population, n_kid):
+def make_kid(population, n_kid, fitness_pop):
     # generate empty kid holder
-    kids = {'DNA': np.empty((n_kid, DNA_SIZE))}
-    kids['mut_strength'] = np.empty_like(kids['DNA'])
+    kids = {'DNA': np.zeros((n_kid, DNA_SIZE)),
+            'mut_strength': np.zeros((n_kid, DNA_SIZE))}
 
     for i in range(n_kid):
-        ks = np.empty(DNA_SIZE) # initialize array
-        kv = np.empty(DNA_SIZE) # initialize array        
-        parents = tournament(population['DNA'], size_tournament, 3)
+        variances = np.zeros(DNA_SIZE) # initialize array
+        dna = np.zeros(DNA_SIZE) # initialize array        
+        parents = tournament(population['DNA'], size_tournament, 3, fitness_pop)
         
-        # p1 = parents[0]
-        # p2 = parents[1]
-        # p3 = parents[2]
-
         # uniform crossing with average among parents
-        kv = (population['DNA'][parents[0] + population['DNA'][parents[1]] + population['DNA'][parents[2]]) / 3
+        dna = (population['DNA'][parents[0]] + population['DNA'][parents[1]] + population['DNA'][parents[2]]) / 3
         # cruce posicional de varianzas
-        cp = np.random.randint(0, 2, DNA_SIZE, dtype=np.bool)  # crossover points
-        for i in range(DNA_SIZE):
-            ks[i]=population['mut_strength'][parents[np.random.randint(3)]][i]
-        
-        # ks[cp] = population['mut_strength'][p1, cp]
-        # ks[~cp] = population['mut_strength'][p2, ~cp]
+        for j in range(DNA_SIZE):
+            variances[j] = population['mut_strength'][parents[np.random.randint(3)]][j]
 
         # DNA and variances mutation 
-        kv = np.random.normal(kv,ks)
-        ks = np.dot(ks, np.dot(np.exp(np.random.normal(0,tau,DNA_SIZE)), np.exp(np.random.normal(0,tau0,DNA_SIZE))))
-        
+        dna = np.random.normal(dna,variances)
+        random_tau = np.exp(np.random.normal(0,tau,DNA_SIZE))
+        random_tau0 = np.exp(np.random.normal(0,tau0,DNA_SIZE))
+        variances = variances * random_tau * random_tau0
+        # variances = np.dot(variances, np.dot(random_tau, random_tau0))
+
         # clip the mutated value
-        kv[:] = np.clip(kv, *DNA_BOUND)
+        dna[:] = np.clip(dna, *DNA_BOUND)
 
         # update kids array
-        kids['DNA'][i] = kv
-        kids['mut_strength'][i] = ks
+        kids['DNA'][i] = dna
+        kids['mut_strength'][i] = variances
 
     return kids
 
 
-def kill_bad(pop, kids, session):
+def kill_bad(pop, kids, session, fitness_dads):
     # put population and kids together
     for key in ['DNA', 'mut_strength']:
         pop[key] = np.vstack((pop[key], kids[key]))
-
-    fitness = evaluation(pop, session)            # calculate global fitness
+    
+    fitness_kids = evaluation(kids, session)            # calculate global fitness
+    fitness = np.concatenate((fitness_dads, fitness_kids))
+        
     idx = np.arange(pop['DNA'].shape[0])
     index_sort = fitness.argsort()
     good_idx = idx[index_sort][:POPULATION_SIZE]   # selected by fitness ranking (not value)
@@ -140,7 +137,7 @@ def main():
     # initialize randomly the population DNA values (motor angles)
     # initialize randomly the variances with big values
     population = dict(DNA=np.random.uniform(low=DNA_BOUND[0], high=DNA_BOUND[1], size=(POPULATION_SIZE,DNA_SIZE) ),   
-            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*10)                                     
+            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE))                                    
             # mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*(DNA_BOUND[1]/2))                                     
     
     # for plotting
@@ -157,31 +154,27 @@ def main():
     adapter = requests.adapters.HTTPAdapter(pool_connections=POPULATION_SIZE, pool_maxsize=POPULATION_SIZE, max_retries=MAX_RETRIES)
     session.mount('http://', adapter)
 
+    fitness_pop = evaluation(population, session)            # calculate global fitness
+    
     for i in range(N_GENERATIONS):
-        kids = make_kid(population, N_KID)
-        population, fitness_pop = kill_bad(population, kids, session)   # keep some good parent for elitism
-        # fitness_population = evaluation(population)
-
+        kids = make_kid(population, N_KID, fitness_pop)
+        population, fitness_pop = kill_bad(population, kids, session, fitness_pop)   # keep some good parent for elitism
         fitness_curve.append(fitness_pop[0]) # Append best individual for plotting
-
         
-        improvements = np.isclose(fitness_pop,previous_fitness_pop,atol=0.01)
 
+        # improvements = np.isclose(fitness_pop,previous_fitness_pop,atol=0.01)
         # boost mut_strength for last hope when population declines
+        # boost = False
+        # if np.std(population['mut_strength']) < 0.01:
+        #     boost = True
+        #     print(" &&&& BOOSTING MUT_STRENGTH &&&& ")
 
-        boost = False
-        if np.std(population['mut_strength']) < 0.01:
-            boost = True
-            print(" &&&& BOOSTING MUT_STRENGTH &&&& ")
-
-        for j in range(POPULATION_SIZE):
-            if (improvements[j] == True):
-                population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
+        # for j in range(POPULATION_SIZE):
+        #     if (improvements[j] == True):
+        #         population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
             # if (boost == True):
             #     population['mut_strength'][j] = population['mut_strength'][j] * 10 # increase mutation
 
-
-        previous_fitness_pop = fitness_pop
 
 
         # ------------------ PLOTTING, DRAWING AND WRITING... ----------------------------
@@ -192,11 +185,13 @@ def main():
         if PLOTTING_REAL_TIME == 1:
             generations_plt.append(i)
             unique = np.unique(fitness_pop) # return ordered unique population fitness
-            fitness_curve2.append(unique[1]) # second best individual
-            fitness_curve3.append(unique[2]) # third best individual
             plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
-            plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
-            plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
+            if len(unique)>1:
+                fitness_curve2.append(unique[1]) # second best individual
+                plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
+            if len(unique)>2:
+                fitness_curve3.append(unique[2]) # third best individual
+                plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
             plt.pause(0.001)
 
         if i%10==0:
