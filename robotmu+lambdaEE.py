@@ -3,26 +3,23 @@ import requests
 import time
 import matplotlib.pyplot as plt
 import concurrent.futures as futures
-from threading import Thread
 
 # lamda = kids
 # mu = progenitores
 
 # NETWORKING
-URL_PATH = "http://163.117.164.219/age/robot10?"
-# N_THREADS = 10
+URL_PATH = "http://163.117.164.219/age/robot10b?"
 MAX_RETRIES = 10
 
-# CONSTANTES
+
 DNA_SIZE = 10                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
-POPULATION_SIZE = 500                     # Population size
+POPULATION_SIZE = 600                     # Population size
 N_GENERATIONS = 1000
-N_KID = 700                               # n kids per generation = lambda
-tau = 0.9/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
-tau0 = 0.9/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
-
-size_tournament = 3
+N_KID = 450                               # n kids per generation = lambda
+tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
+tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
+size_tournament = 4
 
 
 # Plotting
@@ -89,7 +86,6 @@ def make_kid(population, n_kid, fitness_pop):
         random_tau = np.exp(np.random.normal(0,tau,DNA_SIZE))
         random_tau0 = np.exp(np.random.normal(0,tau0,DNA_SIZE))
         variances = variances * random_tau * random_tau0
-        # variances = np.dot(variances, np.dot(random_tau, random_tau0))
 
         # clip the mutated value
         dna[:] = np.clip(dna, *DNA_BOUND)
@@ -137,9 +133,8 @@ def main():
     # initialize randomly the population DNA values (motor angles)
     # initialize randomly the variances with big values
     population = dict(DNA=np.random.uniform(low=DNA_BOUND[0], high=DNA_BOUND[1], size=(POPULATION_SIZE,DNA_SIZE) ),   
-            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE))                                    
-            # mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*(DNA_BOUND[1]/2))                                     
-    
+            mut_strength=np.random.rand(POPULATION_SIZE, DNA_SIZE)*10)                                    
+        
     # for plotting
     if PLOTTING_REAL_TIME == 1:
         plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
@@ -161,21 +156,8 @@ def main():
         population, fitness_pop = kill_bad(population, kids, session, fitness_pop)   # keep some good parent for elitism
         fitness_curve.append(fitness_pop[0]) # Append best individual for plotting
         
-
-        # improvements = np.isclose(fitness_pop,previous_fitness_pop,atol=0.01)
-        # boost mut_strength for last hope when population declines
-        # boost = False
-        # if np.std(population['mut_strength']) < 0.01:
-        #     boost = True
-        #     print(" &&&& BOOSTING MUT_STRENGTH &&&& ")
-
-        # for j in range(POPULATION_SIZE):
-        #     if (improvements[j] == True):
-        #         population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
-            # if (boost == True):
-            #     population['mut_strength'][j] = population['mut_strength'][j] * 10 # increase mutation
-
-
+        if np.std(population['mut_strength']) < 0.01:
+            population['mut_strength'] = population['mut_strength'] * 10
 
         # ------------------ PLOTTING, DRAWING AND WRITING... ----------------------------
 
@@ -186,13 +168,14 @@ def main():
             generations_plt.append(i)
             unique = np.unique(fitness_pop) # return ordered unique population fitness
             plt.plot(generations_plt, fitness_curve, 'b', linewidth=1.0, label='Best individual fitness')
-            if len(unique)>1:
-                fitness_curve2.append(unique[1]) # second best individual
-                plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
-            if len(unique)>2:
-                fitness_curve3.append(unique[2]) # third best individual
-                plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
-            plt.pause(0.001)
+            if i < N_GENERATIONS/2:
+                if len(unique)>1:
+                    fitness_curve2.append(unique[1]) # second best individual
+                    plt.plot(generations_plt, fitness_curve2, 'r', linewidth=1.0, label='Second best individual fitness')
+                if len(unique)>2:
+                    fitness_curve3.append(unique[2]) # third best individual
+                    plt.plot(generations_plt, fitness_curve3, 'g', linewidth=1.0, label='Third best individual fitness')
+                plt.pause(0.001)
 
         if i%10==0:
             print("Iteration num: ",i)
