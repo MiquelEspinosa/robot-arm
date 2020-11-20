@@ -9,19 +9,19 @@ from threading import Thread
 # mu = progenitores
 
 # NETWORKING
-URL_PATH = "http://163.117.164.219/age/robot10?"
+URL_PATH = "http://163.117.164.219/age/robot4?"
 # N_THREADS = 10
 MAX_RETRIES = 10
 
 # CONSTANTES
-DNA_SIZE = 10                             # Corresponds to the number of motors
+DNA_SIZE = 4                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
 POPULATION_SIZE = 100                     # Population size
 N_GENERATIONS = 1000
-N_KID = 200                               # n kids per generation = lambda
+N_KID = 100                               # n kids per generation = lambda
 tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
 tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
-size_tournament = 5
+size_tournament = 3
 
 # adaptation one-fifth rule
 previous_fitness_pop = np.ones(POPULATION_SIZE)
@@ -48,12 +48,12 @@ def process_individual(session, individual):
         print("Exception when calling web service")
         time.sleep(1)
         r = session.get(url).content
-    return float(r)
+    return abs(float(r))
 
 def evaluation(population, session):
     pop_size = len(population['DNA'])
     population_fitness = np.empty(pop_size)
-    with futures.ThreadPoolExecutor(max_workers=POPULATION_SIZE) as executor:
+    with futures.ThreadPoolExecutor(max_workers=POPULATION_SIZE/2) as executor:
         future = [
             executor.submit(process_individual, session, ind)
             for ind in population['DNA']
@@ -76,16 +76,21 @@ def make_kid(population, n_kid):
     for i in range(n_kid):
         ks = np.empty(DNA_SIZE) # initialize array
         kv = np.empty(DNA_SIZE) # initialize array        
-        parents = tournament(population['DNA'], size_tournament, 2)
-        p1 = parents[0]
-        p2 = parents[1]
+        parents = tournament(population['DNA'], size_tournament, 3)
+        
+        # p1 = parents[0]
+        # p2 = parents[1]
+        # p3 = parents[2]
 
         # uniform crossing with average among parents
-        kv = (population['DNA'][p1] + population['DNA'][p2]) / 2
+        kv = (population['DNA'][parents[0] + population['DNA'][parents[1]] + population['DNA'][parents[2]]) / 3
         # cruce posicional de varianzas
         cp = np.random.randint(0, 2, DNA_SIZE, dtype=np.bool)  # crossover points
-        ks[cp] = population['mut_strength'][p1, cp]
-        ks[~cp] = population['mut_strength'][p2, ~cp]
+        for i in range(DNA_SIZE):
+            ks[i]=population['mut_strength'][parents[np.random.randint(3)]][i]
+        
+        # ks[cp] = population['mut_strength'][p1, cp]
+        # ks[~cp] = population['mut_strength'][p2, ~cp]
 
         # DNA and variances mutation 
         kv = np.random.normal(kv,ks)
@@ -172,8 +177,8 @@ def main():
         for j in range(POPULATION_SIZE):
             if (improvements[j] == True):
                 population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
-            if (boost == True):
-                population['mut_strength'][j] = population['mut_strength'][j] * 10 # increase mutation
+            # if (boost == True):
+            #     population['mut_strength'][j] = population['mut_strength'][j] * 10 # increase mutation
 
 
         previous_fitness_pop = fitness_pop

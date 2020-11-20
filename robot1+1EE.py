@@ -21,7 +21,7 @@ s = 15                                   # tamaño ventana para array de mejoras
 success = np.zeros(s)                 # guardamos el número de mejoras por cada s iteraciones
 
 # Plotting
-PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
+PLOTTING_REAL_TIME = 0  # Choose to show fitness plot in real time
 generations_plt = []    # Plotting axis
 fitness_curve = []      # Plotting curve
 save_results = 'output'
@@ -70,7 +70,7 @@ def evaluation(individual, session):
         print("Exception2 when calling web service")
         time.sleep(1)
         return evaluation(individual, session)
-    return float(r)
+    return abs(float(r))
    
 def make_kid(dad):
     # generate empty kid holder
