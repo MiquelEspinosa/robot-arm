@@ -162,10 +162,18 @@ def main():
         
         improvements = np.isclose(fitness_pop,previous_fitness_pop,atol=0.01)
 
+        # boost mut_strength for last hope when population declines
+
+        boost = False
+        if np.std(population['mut_strength']) < 0.01:
+            boost = True
+            print(" &&&& BOOSTING MUT_STRENGTH &&&& ")
+
         for j in range(POPULATION_SIZE):
             if (improvements[j] == True):
                 population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
-
+            if (boost == True):
+                population['mut_strength'][j] = population['mut_strength'][j] * 10 # increase mutation
 
 
         previous_fitness_pop = fitness_pop
