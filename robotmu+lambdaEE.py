@@ -9,19 +9,25 @@ from threading import Thread
 # mu = progenitores
 
 # NETWORKING
-URL_PATH = "http://163.117.164.219/age/robot4?"
+URL_PATH = "http://163.117.164.219/age/robot10?"
 # N_THREADS = 10
 MAX_RETRIES = 10
 
 # CONSTANTES
-DNA_SIZE = 4                             # Corresponds to the number of motors
+DNA_SIZE = 10                             # Corresponds to the number of motors
 DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
 POPULATION_SIZE = 100                     # Population size
-N_GENERATIONS = 500
+N_GENERATIONS = 1000
 N_KID = 200                               # n kids per generation = lambda
 tau = 1/np.sqrt(2*np.sqrt(DNA_SIZE))     # consideramos b = 1
 tau0 = 1/np.sqrt(2*DNA_SIZE)             # consideramos b = 1
 size_tournament = 5
+
+# adaptation one-fifth rule
+previous_fitness_pop = np.ones(POPULATION_SIZE)
+c = 0.82                                 # constante para la regla de 1/5
+# s = 15                                   # tamaño ventana para array de mejoras
+# success = np.zeros(s)                 # guardamos el número de mejoras por cada s iteraciones
 
 # Plotting
 PLOTTING_REAL_TIME = 1  # Choose to show fitness plot in real time
@@ -121,6 +127,7 @@ def write_header_txt(file):
     file.write('------------------------------------ \n')
 
 def main():
+    global previous_fitness_pop
     name = str(save_results+'.txt')
     file = open(name, "w")
     write_header_txt(file)
@@ -151,6 +158,20 @@ def main():
         # fitness_population = evaluation(population)
 
         fitness_curve.append(fitness_pop[0]) # Append best individual for plotting
+
+        
+        improvements = np.isclose(fitness_pop,previous_fitness_pop,atol=0.01)
+
+        for j in range(POPULATION_SIZE):
+            if (improvements[j] == True):
+                population['mut_strength'][j] = population['mut_strength'][j] * c # decrease mutation
+
+
+
+        previous_fitness_pop = fitness_pop
+
+
+        # ------------------ PLOTTING, DRAWING AND WRITING... ----------------------------
 
         if (fitness_curve[i-1] != fitness_curve[i]):
             file.write(' %r\t\t\t%r\n\t\t\t\t\t\t%r\n\n' % (fitness_pop[0],population['DNA'][0],population['mut_strength'][0]))

@@ -16,7 +16,7 @@ DNA_BOUND = [-180, 180]                  # Upper and lower bounds for DNA values
 N_GENERATIONS = 2000
 
 # one-fifth rule
-c = 0.8                                 # constante para la regla de 1/5
+c = 0.82                                 # constante para la regla de 1/5
 s = 15                                   # tamaño ventana para array de mejoras
 success = np.zeros(s)                 # guardamos el número de mejoras por cada s iteraciones
 
@@ -47,6 +47,7 @@ for opt, arg in opts:
     elif opt in ("-r", "--robot"):
         robot = arg
         URL_PATH = str("http://163.117.164.219/age/robot"+robot+"?")
+        DNA_SIZE = int(robot)
     elif opt in ("-n", "--numgeneration"):
         N_GENERATIONS = int(arg)
     elif opt in ("-c", "--constante"):
@@ -136,12 +137,14 @@ def main():
     for i in range(N_GENERATIONS):
         
         # small trick for fast convergence at the start, and slower and precise at the end
-        if (i < (N_GENERATIONS*0.8)):
-            num_decimals = 0
+        if (i < (N_GENERATIONS*0.7)):
+            num_decimals = -1 # round to nearest 10
+        elif (i < (N_GENERATIONS*0.8)):
+            num_decimals = 0 # round to nearest 1
         elif (i < (N_GENERATIONS*0.9)):
-            num_decimals = 1
+            num_decimals = 1 # round to nearest 0.1
         else:
-            num_decimals = 2
+            num_decimals = 2 # round to nearest 0.01
 
         kid = make_kid(dad)
         best, fitness, winner = kill_bad(dad, kid, session, num_decimals)
